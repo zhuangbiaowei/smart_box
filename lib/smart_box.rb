@@ -1,5 +1,7 @@
-require_relative "smart_box/version"
+# frozen_string_literal: true
 
-module SmartBox
-  class Error < StandardError; end
-end
+require_relative "smart_box/version"
+require_relative "smart_box/errors"
+require_relative "smart_box/metadata"
+require_relative "smart_box/modes/copy_mode"
+require_relative "smart_box/box"
