@@ -146,6 +146,53 @@ module SmartBox
       end
     end
 
+    def checkpoint(name)
+      raise Error, "Workspace does not exist" unless Dir.exist?(@workspace_path)
+
+      Dir.chdir(@workspace_path) do
+        system("git", "add", "-A", out: File::NULL, err: File::NULL)
+        system("git", "commit", "--allow-empty", "-m", name, out: File::NULL, err: File::NULL)
+      end
+
+      commit = git_latest_commit
+      cp_id = "cp-#{format('%03d', (@metadata.checkpoints.size + 1))}"
+
+      @metadata.load!
+      @metadata.add_checkpoint(
+        id:         cp_id,
+        name:       name,
+        git_commit: commit,
+        created_at: Time.now.utc.iso8601
+      )
+      @metadata.updated_at = Time.now.utc.iso8601
+      @metadata.save!
+
+      { id: cp_id, name: name, commit: commit }
+    end
+
+    def checkpoints
+      @metadata.load!
+      @metadata.checkpoints.map do |cp|
+        { "id" => cp["id"], "name" => cp["name"] }
+      end
+    end
+
+    def rollback(checkpoint_id)
+      cp = @metadata.checkpoints.detect { |c| c["id"] == checkpoint_id }
+      raise CheckpointNotFoundError, "Checkpoint '#{checkpoint_id}' not found" unless cp
+
+      Dir.chdir(@workspace_path) do
+        system("git", "reset", "--hard", cp["git_commit"], out: File::NULL, err: File::NULL)
+        system("git", "clean", "-fd", out: File::NULL, err: File::NULL)
+      end
+
+      @metadata.load!
+      @metadata.updated_at = Time.now.utc.iso8601
+      @metadata.save!
+
+      { box_id: @id, checkpoint_id: checkpoint_id }
+    end
+
     private
 
     attr_reader :box_dir, :metadata_path

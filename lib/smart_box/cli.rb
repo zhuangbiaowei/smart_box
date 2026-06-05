@@ -146,15 +146,65 @@ module SmartBox
     end
 
     def self.cmd_checkpoint(argv)
-      puts "checkpoint: not yet implemented"
+      opts = parse_checkpoint(argv)
+      id   = opts[:id]
+      name = opts[:name]
+
+      unless id
+        $stderr.puts "Error: --id is required"
+        exit 1
+      end
+
+      unless name
+        $stderr.puts "Error: --name is required"
+        exit 1
+      end
+
+      box  = SmartBox::Box.load(source: opts[:source] || ".", id: id)
+      cp   = box.checkpoint(name)
+
+      puts "Checkpoint created:"
+      puts "  id: #{cp[:id]}"
+      puts "  name: #{cp[:name]}"
+      puts "  commit: #{cp[:commit][0..7]}"
     end
 
     def self.cmd_checkpoints(argv)
-      puts "checkpoints: not yet implemented"
+      opts = parse_box_opts(argv, require_id: true)
+      box  = SmartBox::Box.load(source: opts[:source] || ".", id: opts[:id])
+      cps  = box.checkpoints
+
+      if cps.empty?
+        puts "No checkpoints."
+        return
+      end
+
+      cps.each do |cp|
+        puts "#{cp['id']}  #{cp['name']}"
+      end
     end
 
     def self.cmd_rollback(argv)
-      puts "rollback: not yet implemented"
+      opts        = parse_rollback(argv)
+      id          = opts[:id]
+      checkpoint  = opts[:checkpoint]
+
+      unless id
+        $stderr.puts "Error: --id is required"
+        exit 1
+      end
+
+      unless checkpoint
+        $stderr.puts "Error: --checkpoint is required"
+        exit 1
+      end
+
+      box = SmartBox::Box.load(source: opts[:source] || ".", id: id)
+      box.rollback(checkpoint)
+
+      puts "Rolled back:"
+      puts "  box: #{id}"
+      puts "  checkpoint: #{checkpoint}"
     end
 
     def self.cmd_diff(argv)
@@ -214,6 +264,26 @@ module SmartBox
         p.on("--source PATH")           { |v| opts[:source] = v }
         p.on("--id ID")                 { |v| opts[:id] = v }
         p.on("--allow-dangerous")       { |v| opts[:allow_dangerous] = true }
+      end.parse!(argv)
+      opts
+    end
+
+    def self.parse_checkpoint(argv)
+      opts = {}
+      OptionParser.new do |p|
+        p.on("--source PATH") { |v| opts[:source] = v }
+        p.on("--id ID")       { |v| opts[:id] = v }
+        p.on("--name NAME")   { |v| opts[:name] = v }
+      end.parse!(argv)
+      opts
+    end
+
+    def self.parse_rollback(argv)
+      opts = {}
+      OptionParser.new do |p|
+        p.on("--source PATH")     { |v| opts[:source] = v }
+        p.on("--id ID")           { |v| opts[:id] = v }
+        p.on("--checkpoint CP")   { |v| opts[:checkpoint] = v }
       end.parse!(argv)
       opts
     end
