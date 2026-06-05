@@ -286,6 +286,12 @@ module SmartBox
 
     def discard
       raise Error, "Box directory does not exist" unless Dir.exist?(@box_dir)
+
+      # For git-worktree mode, remove the worktree first
+      if %w[git-worktree git_worktree].include?(@metadata.mode)
+        mode_instance.teardown
+      end
+
       FileUtils.rm_rf(@box_dir)
       @metadata.status = "discarded"
       { id: @id, status: "discarded" }
@@ -314,6 +320,10 @@ module SmartBox
         Modes::CopyMode.new(
           source_path:    @source_path,
           workspace_path: @workspace_path
+        )
+      when "git-worktree", "git_worktree"
+        Modes::GitWorktreeMode.new(
+          source_path: @source_path, workspace_path: @workspace_path, box_id: @id
         )
       else
         raise InvalidModeError, "Unknown mode: #{@mode}"
