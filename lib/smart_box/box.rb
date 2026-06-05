@@ -315,7 +315,9 @@ module SmartBox
     end
 
     def mode_instance
-      case @mode
+      current_mode = @mode.to_s.empty? ? @metadata.mode.to_s : @mode.to_s
+
+      case current_mode
       when "copy"
         Modes::CopyMode.new(
           source_path:    @source_path,
@@ -326,7 +328,7 @@ module SmartBox
           source_path: @source_path, workspace_path: @workspace_path, box_id: @id
         )
       else
-        raise InvalidModeError, "Unknown mode: #{@mode}"
+        raise InvalidModeError, "Unknown mode: #{current_mode}"
       end
     end
 
