@@ -1,0 +1,21 @@
+PATH
+  remote: .
+  specs:
+    smart_box (0.1.0)
+
+GEM
+  remote: https://rubygems.org/
+  specs:
+
+PLATFORMS
+  ruby
+  x86_64-linux
+
+DEPENDENCIES
+  smart_box!
+
+CHECKSUMS
+  smart_box (0.1.0)
+
+BUNDLED WITH
+  4.0.13
