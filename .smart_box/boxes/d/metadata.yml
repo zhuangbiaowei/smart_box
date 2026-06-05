@@ -1,0 +1,21 @@
+---
+id: d
+name: 
+mode: copy
+source_path: "/root/smart_box"
+workspace_path: "/root/smart_box/.smart_box/boxes/d/workspace"
+status: active
+created_at: '2026-06-05T14:05:55Z'
+updated_at: '2026-06-05T14:05:59Z'
+base:
+  type: copy
+  source_git_commit: 5f2957c6bb749633274ea01578eccfb0f054b215
+  source_git_branch: master
+checkpoints:
+- id: cp-001
+  name: initial
+  git_commit: 5ef6897c6c44597df834c2f3147e30b008619b0c
+  created_at: '2026-06-05T14:05:55Z'
+stats:
+  commands_count: 1
+  changed_files_count: 0

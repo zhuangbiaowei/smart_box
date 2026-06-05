@@ -208,11 +208,36 @@ module SmartBox
     end
 
     def self.cmd_diff(argv)
-      puts "diff: not yet implemented"
+      opts = parse_diff(argv)
+      box  = SmartBox::Box.load(source: opts[:source] || ".", id: opts[:id])
+
+      unless box.metadata.id
+        $stderr.puts "Error: --id is required"
+        exit 1
+      end
+
+      puts box.diff(from: opts[:from], to: opts[:to])
     end
 
     def self.cmd_export_patch(argv)
-      puts "export-patch: not yet implemented"
+      opts = parse_export_patch(argv)
+
+      unless opts[:id]
+        $stderr.puts "Error: --id is required"
+        exit 1
+      end
+
+      unless opts[:output]
+        $stderr.puts "Error: --output is required"
+        exit 1
+      end
+
+      box = SmartBox::Box.load(source: opts[:source] || ".", id: opts[:id])
+      result = box.export_patch(output: opts[:output], from: opts[:from], to: opts[:to])
+
+      puts "Patch exported:"
+      puts "  #{result[:output]}"
+      puts "  #{result[:size]} bytes"
     end
 
     def self.cmd_apply(argv)
@@ -284,6 +309,29 @@ module SmartBox
         p.on("--source PATH")     { |v| opts[:source] = v }
         p.on("--id ID")           { |v| opts[:id] = v }
         p.on("--checkpoint CP")   { |v| opts[:checkpoint] = v }
+      end.parse!(argv)
+      opts
+    end
+
+    def self.parse_diff(argv)
+      opts = {}
+      OptionParser.new do |p|
+        p.on("--source PATH") { |v| opts[:source] = v }
+        p.on("--id ID")       { |v| opts[:id] = v }
+        p.on("--from CP")     { |v| opts[:from] = v }
+        p.on("--to CP")       { |v| opts[:to] = v }
+      end.parse!(argv)
+      opts
+    end
+
+    def self.parse_export_patch(argv)
+      opts = {}
+      OptionParser.new do |p|
+        p.on("--source PATH") { |v| opts[:source] = v }
+        p.on("--id ID")       { |v| opts[:id] = v }
+        p.on("--output FILE") { |v| opts[:output] = v }
+        p.on("--from CP")     { |v| opts[:from] = v }
+        p.on("--to CP")       { |v| opts[:to] = v }
       end.parse!(argv)
       opts
     end

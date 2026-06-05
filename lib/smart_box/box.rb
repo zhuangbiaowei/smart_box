@@ -193,6 +193,43 @@ module SmartBox
       { box_id: @id, checkpoint_id: checkpoint_id }
     end
 
+    def diff(from: nil, to: nil)
+      raise Error, "Workspace does not exist" unless Dir.exist?(@workspace_path)
+
+      Dir.chdir(@workspace_path) do
+        # Stage everything so untracked files appear in diff
+        system("git", "add", "-A", out: File::NULL, err: File::NULL)
+
+        from_commit = if from
+                        resolve_checkpoint_commit(from)
+                      else
+                        init = @metadata.checkpoints.first
+                        init ? init["git_commit"] : "HEAD~1"
+                      end
+
+        to_commit = to ? resolve_checkpoint_commit(to) : nil
+
+        if to_commit
+          `git diff #{from_commit} #{to_commit} 2>/dev/null`
+        else
+          `git diff --cached #{from_commit} 2>/dev/null`
+        end
+      end
+    end
+
+    def export_patch(output:, from: nil, to: nil)
+      output_path = if output.start_with?("/")
+                      output
+                    else
+                      File.join(Dir.pwd, output)
+                    end
+
+      patch_content = diff(from: from, to: to)
+      File.write(output_path, patch_content)
+
+      { output: output_path, size: patch_content.bytesize }
+    end
+
     private
 
     attr_reader :box_dir, :metadata_path
@@ -240,6 +277,16 @@ module SmartBox
 
       Dir.chdir(@source_path) do
         `git rev-parse --abbrev-ref HEAD 2>/dev/null`.strip
+      end
+    end
+
+    def resolve_checkpoint_commit(checkpoint_id)
+      cp = @metadata.checkpoints.detect { |c| c["id"] == checkpoint_id }
+      if cp
+        cp["git_commit"]
+      else
+        # Assume it's a raw commit hash or git ref
+        checkpoint_id
       end
     end
   end
