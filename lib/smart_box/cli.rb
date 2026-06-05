@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require "smart_box"
+require_relative "../smart_box"
 require "optparse"
 
 module SmartBox
