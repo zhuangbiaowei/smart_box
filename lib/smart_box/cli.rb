@@ -122,7 +122,27 @@ module SmartBox
     end
 
     def self.cmd_run(argv)
-      puts "run: not yet implemented"
+      argv.shift  # remove "run" subcommand name
+      opts = parse_run(argv)
+      id = opts[:id]
+
+      unless id
+        $stderr.puts "Error: --id is required"
+        exit 1
+      end
+
+      command = argv.join(" ")
+      if command.empty?
+        $stderr.puts "Error: command is required (use -- before command args)"
+        exit 1
+      end
+
+      box = SmartBox::Box.load(source: opts[:source] || ".", id: id)
+      result = box.run(command, allow_dangerous: opts[:allow_dangerous])
+
+      $stdout.write(result.stdout)
+      $stderr.write(result.stderr) unless result.stderr.empty?
+      exit result.exit_code
     end
 
     def self.cmd_checkpoint(argv)
@@ -185,6 +205,16 @@ module SmartBox
         $stderr.puts "Error: --id is required"
         exit 1
       end
+      opts
+    end
+
+    def self.parse_run(argv)
+      opts = {}
+      OptionParser.new do |p|
+        p.on("--source PATH")           { |v| opts[:source] = v }
+        p.on("--id ID")                 { |v| opts[:id] = v }
+        p.on("--allow-dangerous")       { |v| opts[:allow_dangerous] = true }
+      end.parse!(argv)
       opts
     end
 

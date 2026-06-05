@@ -135,9 +135,28 @@ module SmartBox
       end
     end
 
+    def run(command, env: {}, timeout: nil, allow_dangerous: false)
+      runner.run(command, env: env, timeout: timeout, allow_dangerous: allow_dangerous).tap do
+        # Update metadata stats
+        @metadata.load!
+        stats = @metadata.stats
+        stats["commands_count"] = (stats["commands_count"] || 0) + 1
+        @metadata.updated_at = Time.now.utc.iso8601
+        @metadata.save!
+      end
+    end
+
     private
 
     attr_reader :box_dir, :metadata_path
+
+    def runner
+      @runner ||= Runner.new(
+        box_id:         @id,
+        workspace_path: @workspace_path,
+        logs_dir:       File.join(@box_dir, "logs")
+      )
+    end
 
     def mode_instance
       case @mode

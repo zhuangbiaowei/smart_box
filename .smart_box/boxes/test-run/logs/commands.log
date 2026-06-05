@@ -1,0 +1,40 @@
+[2026-06-05 21:59:51] RUN run echo hello
+cwd: /root/smart_box/.smart_box/boxes/test-run/workspace
+exit_code: 127
+
+STDOUT:
+(empty)
+
+STDERR:
+Command not found: No such file or directory - run
+
+[2026-06-05 22:00:22] RUN run echo hello from box
+cwd: /root/smart_box/.smart_box/boxes/test-run/workspace
+exit_code: 127
+
+STDOUT:
+(empty)
+
+STDERR:
+Command not found: No such file or directory - run
+
+[2026-06-05 22:01:13] RUN echo hello from box
+cwd: /root/smart_box/.smart_box/boxes/test-run/workspace
+exit_code: 0
+
+STDOUT:
+hello from box
+
+STDERR:
+(empty)
+
+[2026-06-05 22:01:55] RUN echo bypassed
+cwd: /root/smart_box/.smart_box/boxes/test-run/workspace
+exit_code: 0
+
+STDOUT:
+bypassed
+
+STDERR:
+(empty)
+
