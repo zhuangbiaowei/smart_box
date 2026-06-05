@@ -230,6 +230,72 @@ module SmartBox
       { output: output_path, size: patch_content.bytesize }
     end
 
+    def apply(dry_run: false, force: false)
+      raise Error, "Workspace does not exist" unless Dir.exist?(@workspace_path)
+
+      patch_content = diff(from: @metadata.checkpoints.first&.dig("git_commit"))
+
+      if dry_run
+        return { dry_run: true, patch_size: patch_content.bytesize }
+      end
+
+      # Check if source is a git repo and if it's clean
+      if Dir.exist?(File.join(@source_path, ".git"))
+        unless force
+          check_source_clean!
+        end
+
+        # Create backup patch of current source state
+        backup_patch_path = File.join(@box_dir, "patches", "backup.patch")
+        FileUtils.mkdir_p(File.join(@box_dir, "patches"))
+
+        Dir.chdir(@source_path) do
+          backup = `git diff 2>/dev/null`
+          File.write(backup_patch_path, backup) unless backup.empty?
+        end
+
+        # Apply the patch
+        Dir.chdir(@source_path) do
+          IO.popen(["git", "apply", "-v"], "w") do |io|
+            io.write(patch_content)
+          end
+
+          unless $?.success?
+            raise PatchApplyError, "Failed to apply patch. The source project may have conflicts."
+          end
+
+          # Show what changed
+          result_diff = `git diff 2>/dev/null`
+          result_diff
+        end
+      else
+        # Non-git source: apply patch with patch command
+        backup_patch_path = File.join(@box_dir, "patches", "backup.diff")
+        FileUtils.mkdir_p(File.join(@box_dir, "patches"))
+        File.write(backup_patch_path, "backup not available for non-git source")
+
+        Dir.chdir(@source_path) do
+          IO.popen(["patch", "-p1", "-N", "-r", "/dev/null"], "w") do |io|
+            io.write(patch_content)
+          end
+        end
+
+        "Patch applied to non-git source at #{@source_path}"
+      end
+    end
+
+    def discard
+      raise Error, "Box directory does not exist" unless Dir.exist?(@box_dir)
+      FileUtils.rm_rf(@box_dir)
+      @metadata.status = "discarded"
+      { id: @id, status: "discarded" }
+    end
+
+    def source_clean?
+      return true unless Dir.exist?(File.join(@source_path, ".git"))
+      Dir.chdir(@source_path) { `git status --porcelain 2>/dev/null`.strip.empty? }
+    end
+
     private
 
     attr_reader :box_dir, :metadata_path
@@ -285,8 +351,15 @@ module SmartBox
       if cp
         cp["git_commit"]
       else
-        # Assume it's a raw commit hash or git ref
         checkpoint_id
+      end
+    end
+
+    def check_source_clean!
+      unless source_clean?
+        raise DirtySourceError,
+          "Source project has uncommitted changes.\n" \
+          "Use --force to apply anyway."
       end
     end
   end

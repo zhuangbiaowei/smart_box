@@ -241,11 +241,43 @@ module SmartBox
     end
 
     def self.cmd_apply(argv)
-      puts "apply: not yet implemented"
+      opts = parse_apply(argv)
+
+      unless opts[:id]
+        $stderr.puts "Error: --id is required"
+        exit 1
+      end
+
+      box = SmartBox::Box.load(source: opts[:source] || ".", id: opts[:id])
+
+      if opts[:dry_run]
+        result = box.apply(dry_run: true)
+        puts "Dry run:"
+        puts "  patch size: #{result[:patch_size]} bytes"
+        puts "  Would apply #{result[:patch_size] > 0 ? 'changes' : 'no changes'} to #{box.source_path}"
+        return
+      end
+
+      # Check if source is clean before applying
+      unless opts[:force] || box.source_clean?
+        $stderr.puts "Error: Source project has uncommitted changes."
+        $stderr.puts "Use --force to apply anyway, or --dry-run to preview."
+        exit 1
+      end
+
+      result = box.apply(force: opts[:force])
+      puts "Patch applied:"
+      puts result
     end
 
     def self.cmd_discard(argv)
-      puts "discard: not yet implemented"
+      opts = parse_box_opts(argv, require_id: true)
+      box  = SmartBox::Box.load(source: opts[:source] || ".", id: opts[:id])
+      result = box.discard
+
+      puts "Box discarded:"
+      puts "  id: #{result[:id]}"
+      puts "  status: #{result[:status]}"
     end
 
     # --- Option parsers ---
@@ -332,6 +364,17 @@ module SmartBox
         p.on("--output FILE") { |v| opts[:output] = v }
         p.on("--from CP")     { |v| opts[:from] = v }
         p.on("--to CP")       { |v| opts[:to] = v }
+      end.parse!(argv)
+      opts
+    end
+
+    def self.parse_apply(argv)
+      opts = {}
+      OptionParser.new do |p|
+        p.on("--source PATH") { |v| opts[:source] = v }
+        p.on("--id ID")       { |v| opts[:id] = v }
+        p.on("--dry-run")     { |v| opts[:dry_run] = true }
+        p.on("--force")       { |v| opts[:force] = true }
       end.parse!(argv)
       opts
     end
