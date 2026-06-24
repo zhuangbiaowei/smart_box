@@ -333,7 +333,10 @@ module SmartBox
     end
 
     def git_latest_commit
-      return "none" unless Dir.exist?(File.join(@workspace_path, ".git"))
+      # In git-worktree mode the workspace's `.git` is a FILE (a gitdir
+      # pointer), not a directory — so Dir.exist? is false and this would
+      # wrongly return "none". File.exist? is true for both files and dirs.
+      return "none" unless File.exist?(File.join(@workspace_path, ".git"))
 
       Dir.chdir(@workspace_path) do
         `git rev-parse HEAD 2>/dev/null`.strip
