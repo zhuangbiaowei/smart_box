@@ -93,13 +93,14 @@ module SmartBox
       end
 
       def init_git!
-        Dir.chdir(@workspace_path) do
-          system("git", "init", out: File::NULL, err: File::NULL)
-          system("git", "config", "user.email", "smart_box@localhost", out: File::NULL, err: File::NULL)
-          system("git", "config", "user.name", "smart_box", out: File::NULL, err: File::NULL)
-          system("git", "add", "-A", out: File::NULL, err: File::NULL)
-          system("git", "commit", "-m", "smart_box initial checkpoint", out: File::NULL, err: File::NULL)
-        end
+        system("git", "init", chdir: @workspace_path, out: File::NULL, err: File::NULL)
+        system("git", "config", "user.email", "smart_box@localhost",
+               chdir: @workspace_path, out: File::NULL, err: File::NULL)
+        system("git", "config", "user.name", "smart_box",
+               chdir: @workspace_path, out: File::NULL, err: File::NULL)
+        system("git", "add", "-A", chdir: @workspace_path, out: File::NULL, err: File::NULL)
+        system("git", "commit", "-m", "smart_box initial checkpoint",
+               chdir: @workspace_path, out: File::NULL, err: File::NULL)
       end
     end
   end

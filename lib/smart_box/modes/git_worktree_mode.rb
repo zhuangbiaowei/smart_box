@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "open3"
+
 module SmartBox
   module Modes
     class GitWorktreeMode
@@ -46,25 +48,23 @@ module SmartBox
       end
 
       def source_clean?
-        Dir.chdir(@source_path) do
-          `git status --porcelain 2>/dev/null`.strip.empty?
-        end
+        out, _err, _st = Open3.capture3("git", "status", "--porcelain",
+                                        chdir: @source_path)
+        out.strip.empty?
       end
 
       def ensure_branch!
-        Dir.chdir(@source_path) do
-          branches = `git branch --list #{@branch_name} 2>/dev/null`.strip
-          if branches.empty?
-            system("git", "branch", @branch_name, out: File::NULL, err: File::NULL)
-          end
+        branches, _err, _st = Open3.capture3("git", "branch", "--list", @branch_name,
+                                             chdir: @source_path)
+        if branches.strip.empty?
+          system("git", "branch", @branch_name,
+                 chdir: @source_path, out: File::NULL, err: File::NULL)
         end
       end
 
       def create_worktree!
-        Dir.chdir(@source_path) do
-          system("git", "worktree", "add", @workspace_path, @branch_name,
-                 out: File::NULL, err: File::NULL)
-        end
+        system("git", "worktree", "add", @workspace_path, @branch_name,
+               chdir: @source_path, out: File::NULL, err: File::NULL)
 
         unless Dir.exist?(@workspace_path)
           raise SmartBox::Error, "Failed to create git worktree at #{@workspace_path}"
@@ -72,27 +72,22 @@ module SmartBox
       end
 
       def init_checkpoint!
-        Dir.chdir(@workspace_path) do
-          system("git", "add", "-A", out: File::NULL, err: File::NULL)
-          system("git", "commit", "--allow-empty", "-m", "smart_box initial checkpoint",
-                 out: File::NULL, err: File::NULL)
-        end
+        system("git", "add", "-A", chdir: @workspace_path, out: File::NULL, err: File::NULL)
+        system("git", "commit", "--allow-empty", "-m", "smart_box initial checkpoint",
+               chdir: @workspace_path, out: File::NULL, err: File::NULL)
       end
 
       def remove_worktree!
-        Dir.chdir(@source_path) do
-          system("git", "worktree", "remove", @workspace_path, "--force",
-                 out: File::NULL, err: File::NULL)
-          system("git", "branch", "-D", @branch_name,
-                 out: File::NULL, err: File::NULL)
-        end
+        system("git", "worktree", "remove", @workspace_path, "--force",
+               chdir: @source_path, out: File::NULL, err: File::NULL)
+        system("git", "branch", "-D", @branch_name,
+               chdir: @source_path, out: File::NULL, err: File::NULL)
       end
 
       def worktree_exists?
-        Dir.chdir(@source_path) do
-          worktrees = `git worktree list --porcelain 2>/dev/null`
-          worktrees.include?(@workspace_path)
-        end
+        worktrees, _err, _st = Open3.capture3("git", "worktree", "list", "--porcelain",
+                                              chdir: @source_path)
+        worktrees.include?(@workspace_path)
       end
     end
   end

@@ -4,6 +4,7 @@ require "open3"
 require "json"
 require "time"
 require "shellwords"
+require "fileutils"
 require_relative "command_result"
 require_relative "errors"
 
@@ -20,6 +21,11 @@ module SmartBox
       /\bchmod\s+-R\s+777\s+\//,
       /\bchown\s+-R\b/
     ].freeze
+
+    # Exit code used when a command exceeds its timeout (GNU timeout convention).
+    TIMEOUT_EXIT_CODE = 124
+    # Grace period in seconds between TERM and KILL when terminating a process group.
+    KILL_GRACE_SECONDS = 2
 
     attr_reader :box_id, :workspace_path, :logs_dir
 
@@ -69,17 +75,25 @@ module SmartBox
       stderr = ""
       exit_code = nil
 
-      Dir.chdir(@workspace_path) do
-        args = Shellwords.split(command)
-        if env && !env.empty?
-          stdout, stderr, status = Open3.capture3(env, *args, chdir: @workspace_path)
-        else
-          stdout, stderr, status = Open3.capture3(*args, chdir: @workspace_path)
+      args = Shellwords.split(command)
+      # Never switch the parent process directory: all execution is confined to
+      # the workspace via Open3's `chdir:` option. This avoids Ruby's
+      # process-wide `conflicting chdir during another chdir block` error when
+      # boxes run in background threads alongside other threads in the process.
+      if timeout && timeout.to_f > 0
+        stdout, stderr, exit_code = execute_with_timeout(args, env, timeout.to_f)
+      else
+        begin
+          if env && !env.empty?
+            stdout, stderr, status = Open3.capture3(env, *args, chdir: @workspace_path)
+          else
+            stdout, stderr, status = Open3.capture3(*args, chdir: @workspace_path)
+          end
+          exit_code = status.exitstatus
+        rescue Errno::ENOENT => e
+          stderr = "Command not found: #{e.message}"
+          exit_code = 127
         end
-        exit_code = status.exitstatus
-      rescue Errno::ENOENT => e
-        stderr = "Command not found: #{e.message}"
-        exit_code = 127
       end
 
       ended_at = Time.now
@@ -96,6 +110,55 @@ module SmartBox
         started_at: started_at,
         ended_at:   ended_at
       )
+    end
+
+    # Runs a command with a hard timeout by spawning it in its own process group
+    # (pgroup: true) and killing the whole group on timeout. This kills child
+    # processes too (e.g. find/rsync), unlike Ruby's Timeout.timeout.
+    def execute_with_timeout(args, env, timeout_s)
+      popen_args = env && !env.empty? ? [env, *args] : args
+      Open3.popen3(*popen_args, chdir: @workspace_path, pgroup: true) do |stdin, out, err, wait_thr|
+        stdin.close
+
+        # Drain stdout/stderr concurrently to avoid pipe buffer deadlocks.
+        out_reader = Thread.new { out.read }
+        err_reader = Thread.new { err.read }
+
+        waiter = Thread.new { wait_thr.join }
+        timed_out = false
+        unless waiter.join(timeout_s)
+          timed_out = true
+          kill_process_group!(wait_thr)
+        end
+        waiter.kill if waiter.alive?
+
+        stdout = out_reader.value
+        stderr = err_reader.value
+        exit_code = timed_out ? TIMEOUT_EXIT_CODE : wait_thr.value.exitstatus
+
+        if timed_out
+          marker = "[timeout] command exceeded #{format('%g', timeout_s)}s and was killed (exit #{TIMEOUT_EXIT_CODE})"
+          stderr = stderr.to_s.empty? ? marker : "#{stderr.rstrip}\n#{marker}"
+        end
+
+        [stdout, stderr, exit_code]
+      end
+    rescue Errno::ENOENT => e
+      ["", "Command not found: #{e.message}", 127]
+    end
+
+    # Sends TERM to the whole process group, waits a grace period, then KILL.
+    def kill_process_group!(wait_thr)
+      %w[TERM KILL].each_with_index do |signal, idx|
+        break unless wait_thr.alive?
+
+        begin
+          Process.kill(signal, -wait_thr.pid)
+        rescue Errno::ESRCH, Errno::EPERM
+          break # Process group is already gone (or we lack permission).
+        end
+        wait_thr.join(KILL_GRACE_SECONDS) if idx.zero?
+      end
     end
 
     def write_logs(command, result, idx)
