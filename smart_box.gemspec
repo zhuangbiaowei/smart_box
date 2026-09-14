@@ -14,12 +14,14 @@ Gem::Specification.new do |spec|
     and patch export without directly polluting the real project directory.
   DESC
   spec.license       = "MIT"
+  spec.homepage      = "https://github.com/zhuangbiaowei/smart_box"
 
   spec.required_ruby_version = ">= 3.0.0"
 
   spec.metadata = {
-    "source_code_uri" => "https://github.com/smart-box/smart_box",
-    "changelog_uri"   => "https://github.com/smart-box/smart_box/blob/main/CHANGELOG.md"
+    "source_code_uri" => "https://github.com/zhuangbiaowei/smart_box",
+    "changelog_uri"   => "https://github.com/zhuangbiaowei/smart_box/blob/master/CHANGELOG.md",
+    "bug_tracker_uri" => "https://github.com/zhuangbiaowei/smart_box/issues"
   }
 
   spec.files = Dir[
